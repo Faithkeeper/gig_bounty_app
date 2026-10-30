@@ -129,6 +129,44 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     }
   }
 
+  Future<void> _rejectBid(BidModel bid) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      await _bidService.rejectBid(bid.id);
+      if (mounted && messenger != null && messenger.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Bid rejected.')),
+        );
+      }
+    } catch (error) {
+      if (mounted && messenger != null && messenger.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Error rejecting bid: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _acceptBid(BidModel bid) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      await _bidService.acceptBid(bid, widget.task.id);
+      if (mounted && messenger != null && messenger.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Bid accepted! Task is now In Progress.'),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted && messenger != null && messenger.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Error accepting bid: $error')),
+        );
+      }
+    }
+  }
+
   void _showBidDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -452,24 +490,30 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                             children: [
                               Text('Pitch: ${bid.proposalNote}'),
                               const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(Icons.star,
-                                      size: 14, color: Colors.amber),
-                                  Text(
-                                      ' ${bid.providerRating.toStringAsFixed(1)} • Status: ${bid.status}'),
-                                ],
-                              ),
                             ],
                           ),
                           trailing:
                               _isOwner && _isOpen && bid.status == 'Pending'
-                                  ? ElevatedButton(
-                                      onPressed: () => _bidService.acceptBid(
-                                          bid, widget.task.id),
-                                      style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green),
-                                      child: const Text('Accept'),
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          tooltip: 'Reject bid',
+                                          onPressed: () => _rejectBid(bid),
+                                          icon: const Icon(
+                                            Icons.close,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: 'Accept bid',
+                                          onPressed: () => _acceptBid(bid),
+                                          icon: const Icon(
+                                            Icons.check,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                      ],
                                     )
                                   : Chip(
                                       label: Text(bid.status,

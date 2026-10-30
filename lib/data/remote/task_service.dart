@@ -39,6 +39,16 @@ class TaskService {
     });
   }
 
+  Future<void> rejectBid(String bidId) async {
+  try {
+    await _firestore.collection('bids').doc(bidId).update({
+      'status': 'Rejected',
+    });
+  } catch (e) {
+    throw Exception('Failed to reject bid: ${e.toString()}');
+  }
+}
+
   // Update task operational status (e.g., 'In Progress' -> 'Completed')
   Future<void> updateTaskStatus(String taskId, String newStatus,
       {String? completionNote}) async {
