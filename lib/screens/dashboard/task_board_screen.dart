@@ -5,6 +5,7 @@ import '../../models/user_profile.dart';
 import '../task/create_task_screen.dart';
 import '../../data/remote/auth_service.dart';
 import '../task/task_details_screen.dart';
+import '../profile/profile_screen.dart';
 
 class TaskBoardScreen extends StatefulWidget {
   final UserProfile userProfile;
@@ -26,9 +27,24 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
         title: const Text('GigBounty Board'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.person),
+            tooltip: 'View Profile',
+            onPressed: () async {
+              final updated = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(userProfile: widget.userProfile),
+                ),
+              );
+              if (updated == true) {
+                setState(() {}); // Refresh state if profile was updated
+              }
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => AuthService().signOut(),
             tooltip: 'Sign Out',
+            onPressed: () => AuthService().signOut(),
           ),
         ],
       ),

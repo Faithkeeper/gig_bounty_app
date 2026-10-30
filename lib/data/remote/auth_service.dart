@@ -73,4 +73,19 @@ class AuthService {
       rethrow;
     }
   }
+
+  Future<void> updateUserProfile({
+  required String uid,
+  required String fullName,
+  required String role,
+}) async {
+  try {
+    await _firestore.collection('users').doc(uid).update({
+      'fullName': fullName,
+      'role': role,
+    });
+  } catch (e) {
+    throw Exception('Failed to update profile: ${e.toString()}');
+  }
+}
 }
