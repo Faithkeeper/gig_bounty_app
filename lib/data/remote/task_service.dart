@@ -48,4 +48,21 @@ class TaskService {
           .toList();
     });
   }
+
+  Future<void> updateTaskDetails({
+    required String taskId,
+    required String title,
+    required String description,
+    required double budget,
+    required String location,
+    DateTime? deadline,
+  }) async {
+    await _firestore.collection('tasks').doc(taskId).update({
+      'title': title,
+      'description': description,
+      'budget': budget,
+      'location': location,
+      'deadline': deadline != null ? Timestamp.fromDate(deadline) : null,
+    });
+  }
 }

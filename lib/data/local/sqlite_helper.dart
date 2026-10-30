@@ -20,8 +20,13 @@ class SqliteHelper {
 
     return await openDatabase(
       fullPath,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN deadline TEXT');
+        }
+      },
     );
   }
 
@@ -40,7 +45,8 @@ class SqliteHelper {
         status TEXT,
         assignedProvider TEXT,
         completionNote TEXT,
-        createdAt TEXT
+        createdAt TEXT,
+        deadline TEXT
       )
     ''');
 
@@ -60,9 +66,11 @@ class SqliteHelper {
     final db = await database;
     final batch = db.batch();
     for (var task in tasks) {
+      final taskData = task.toMap()
+        ..['deadline'] = task.deadline?.toIso8601String();
       batch.insert(
         'tasks',
-        task.toMap(),
+        taskData,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }

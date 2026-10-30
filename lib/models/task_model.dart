@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class TaskModel {
   final String id;
   final String title;
@@ -11,6 +13,7 @@ class TaskModel {
   final String? assignedProvider;
   final String? completionNote;
   final DateTime createdAt;
+  final DateTime? deadline;
 
   TaskModel({
     required this.id,
@@ -25,6 +28,7 @@ class TaskModel {
     this.assignedProvider,
     this.completionNote,
     required this.createdAt,
+    this.deadline,
   });
 
   Map<String, dynamic> toMap() {
@@ -41,6 +45,7 @@ class TaskModel {
       'assignedProvider': assignedProvider,
       'completionNote': completionNote,
       'createdAt': createdAt.toIso8601String(),
+      'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
     };
   }
 
@@ -57,7 +62,13 @@ class TaskModel {
       status: map['status'] ?? 'Open',
       assignedProvider: map['assignedProvider'],
       completionNote: map['completionNote'],
-      createdAt: DateTime.parse(map['createdAt'] ?? DateTime.now().toIso8601String()),
+      createdAt:
+          DateTime.parse(map['createdAt'] ?? DateTime.now().toIso8601String()),
+      deadline: map['deadline'] == null
+          ? null
+          : map['deadline'] is Timestamp
+              ? (map['deadline'] as Timestamp).toDate()
+              : DateTime.parse(map['deadline'] as String),
     );
   }
 }

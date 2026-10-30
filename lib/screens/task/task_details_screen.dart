@@ -9,7 +9,8 @@ class TaskDetailsScreen extends StatefulWidget {
   final TaskModel task;
   final UserProfile userProfile;
 
-  const TaskDetailsScreen({super.key, required this.task, required this.userProfile});
+  const TaskDetailsScreen(
+      {super.key, required this.task, required this.userProfile});
 
   @override
   State<TaskDetailsScreen> createState() => _TaskDetailsScreenState();
@@ -21,7 +22,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   final _bidFormKey = GlobalKey<FormState>();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
-  final TextEditingController _completionNoteController = TextEditingController();
+  final TextEditingController _completionNoteController =
+      TextEditingController();
+
+  bool get _isOwner => widget.task.posterId == widget.userProfile.uid;
+  bool get _isOpen => widget.task.status == 'Open';
 
   @override
   void dispose() {
@@ -38,11 +43,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         title: const Text('Complete Task Agreement'),
         content: TextField(
           controller: _completionNoteController,
-          decoration: const InputDecoration(labelText: 'Work Summary / Completion Note'),
+          decoration: const InputDecoration(
+              labelText: 'Work Summary / Completion Note'),
           maxLines: 3,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final navigator = Navigator.of(dialogContext);
@@ -73,6 +81,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       ),
     );
   }
+
   bool _isSubmitting = false;
 
   void _submitBid() async {
@@ -109,7 +118,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         if (!mounted) return;
         if (messenger != null) {
           messenger.showSnackBar(
-            SnackBar(content: Text('Error submitting bid: $e'), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('Error submitting bid: $e'),
+                backgroundColor: Colors.red),
           );
         }
       } finally {
@@ -130,14 +141,18 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             children: [
               TextFormField(
                 controller: _priceController,
-                decoration: const InputDecoration(labelText: 'Proposed Price (ZAR)'),
+                decoration:
+                    const InputDecoration(labelText: 'Proposed Price (ZAR)'),
                 keyboardType: TextInputType.number,
-                validator: (val) => double.tryParse(val ?? '') == null ? 'Enter valid price' : null,
+                validator: (val) => double.tryParse(val ?? '') == null
+                    ? 'Enter valid price'
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _noteController,
-                decoration: const InputDecoration(labelText: 'Pitch / Proposal Note'),
+                decoration:
+                    const InputDecoration(labelText: 'Pitch / Proposal Note'),
                 maxLines: 3,
                 validator: (val) => val!.isEmpty ? 'Enter pitch note' : null,
               ),
@@ -145,19 +160,172 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           _isSubmitting
               ? const CircularProgressIndicator()
-              : ElevatedButton(onPressed: _submitBid, child: const Text('Submit Bid')),
+              : ElevatedButton(
+                  onPressed: _submitBid, child: const Text('Submit Bid')),
         ],
       ),
     );
   }
 
+  Future<void> _showEditTaskDialog(BuildContext context) async {
+    final titleController = TextEditingController(text: widget.task.title);
+    final descriptionController =
+        TextEditingController(text: widget.task.description);
+    final budgetController =
+        TextEditingController(text: widget.task.budget.toString());
+    final locationController =
+        TextEditingController(text: widget.task.location);
+    final formKey = GlobalKey<FormState>();
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    try {
+      final updated = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Edit Task'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    decoration: const InputDecoration(labelText: 'Task Title'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter a task title'
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(labelText: 'Description'),
+                    maxLines: 3,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter a description'
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: budgetController,
+                    decoration:
+                        const InputDecoration(labelText: 'Budget (ZAR)'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      final budget = double.tryParse(value?.trim() ?? '');
+                      return budget == null || budget <= 0
+                          ? 'Enter a valid budget'
+                          : null;
+                    },
+                  ),
+                  TextFormField(
+                    controller: locationController,
+                    decoration:
+                        const InputDecoration(labelText: 'Location / Ward'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter a location'
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState?.validate() != true) return;
+                try {
+                  await _taskService.updateTaskDetails(
+                    taskId: widget.task.id,
+                    title: titleController.text.trim(),
+                    description: descriptionController.text.trim(),
+                    budget: double.parse(budgetController.text.trim()),
+                    location: locationController.text.trim(),
+                    deadline: widget.task.deadline,
+                  );
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext, true);
+                  }
+                } catch (error) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Error updating task: $error')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      );
+
+      if (updated == true && mounted) {
+        if (navigator.mounted) navigator.pop(true);
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('Task updated successfully.')),
+        );
+      }
+    } finally {
+      titleController.dispose();
+      descriptionController.dispose();
+      budgetController.dispose();
+      locationController.dispose();
+    }
+  }
+
+  Future<void> _cancelTask() async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel Task?'),
+        content: const Text(
+          'This will permanently remove the task and its bids.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep Task'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel Task'),
+          ),
+        ],
+      ),
+    );
+    if (shouldCancel != true || !mounted) return;
+
+    try {
+      await _taskService.deleteTask(widget.task.id);
+      if (!mounted) return;
+      if (navigator.mounted) navigator.pop();
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('Task cancelled and removed.')),
+      );
+    } catch (error) {
+      if (mounted && messenger != null && messenger.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Error cancelling task: $error')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCustomer = widget.userProfile.role == 'Customer';
-    final isOwner = widget.task.posterId == widget.userProfile.uid;
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.task.title)),
@@ -166,11 +334,18 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.task.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(widget.task.title,
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text('Category: ${widget.task.category} • Location: ${widget.task.location}'),
+            Text(
+                'Category: ${widget.task.category} • Location: ${widget.task.location}'),
             const SizedBox(height: 8),
-            Text('Budget: R${widget.task.budget.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, color: Colors.deepOrange, fontWeight: FontWeight.bold)),
+            Text('Budget: R${widget.task.budget.toStringAsFixed(2)}',
+                style: const TextStyle(
+                    fontSize: 18,
+                    color: Colors.deepOrange,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Text(widget.task.description),
             // Lifecycle Status Banner & Action
@@ -192,7 +367,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     ),
                     ElevatedButton(
                       onPressed: () => _showCompletionDialog(context),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green),
                       child: const Text('Mark Complete'),
                     ),
                   ],
@@ -212,7 +388,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   children: [
                     const Text(
                       'Task Successfully Completed!',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: Colors.green),
                     ),
                     if (widget.task.completionNote != null) ...[
                       const SizedBox(height: 4),
@@ -222,8 +399,31 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                 ),
               ),
             ],
+            if (_isOwner && _isOpen) ...[
+              const Divider(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      label: const Text('Edit Task'),
+                      onPressed: () => _showEditTaskDialog(context),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.cancel, color: Colors.red),
+                      label: const Text('Cancel Task'),
+                      onPressed: _cancelTask,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const Divider(height: 32),
-            const Text('Competing Bids / Offers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Competing Bids / Offers',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Expanded(
               child: StreamBuilder<List<BidModel>>(
@@ -233,7 +433,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No bids submitted for this task yet.'));
+                    return const Center(
+                        child: Text('No bids submitted for this task yet.'));
                   }
 
                   final bids = snapshot.data!;
@@ -244,7 +445,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          title: Text('${bid.providerName} (R${bid.proposedPrice.toStringAsFixed(2)})'),
+                          title: Text(
+                              '${bid.providerName} (R${bid.proposedPrice.toStringAsFixed(2)})'),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -252,26 +454,34 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  const Icon(Icons.star, size: 14, color: Colors.amber),
-                                  Text(' ${bid.providerRating.toStringAsFixed(1)} • Status: ${bid.status}'),
+                                  const Icon(Icons.star,
+                                      size: 14, color: Colors.amber),
+                                  Text(
+                                      ' ${bid.providerRating.toStringAsFixed(1)} • Status: ${bid.status}'),
                                 ],
                               ),
                             ],
                           ),
-                          trailing: isOwner && widget.task.status == 'Open' && bid.status == 'Pending'
-                              ? ElevatedButton(
-                                  onPressed: () => _bidService.acceptBid(bid, widget.task.id),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                  child: const Text('Accept'),
-                                )
-                              : Chip(
-                                  label: Text(bid.status, style: const TextStyle(fontSize: 10, color: Colors.white)),
-                                  backgroundColor: bid.status == 'Accepted'
-                                      ? Colors.green
-                                      : bid.status == 'Rejected'
-                                          ? Colors.red
-                                          : Colors.orange,
-                                ),
+                          trailing:
+                              _isOwner && _isOpen && bid.status == 'Pending'
+                                  ? ElevatedButton(
+                                      onPressed: () => _bidService.acceptBid(
+                                          bid, widget.task.id),
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green),
+                                      child: const Text('Accept'),
+                                    )
+                                  : Chip(
+                                      label: Text(bid.status,
+                                          style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.white)),
+                                      backgroundColor: bid.status == 'Accepted'
+                                          ? Colors.green
+                                          : bid.status == 'Rejected'
+                                              ? Colors.red
+                                              : Colors.orange,
+                                    ),
                         ),
                       );
                     },
@@ -292,4 +502,3 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
   }
 }
-

@@ -6,7 +6,8 @@ class CreateTaskScreen extends StatefulWidget {
   final String userId;
   final String userName;
 
-  const CreateTaskScreen({super.key, required this.userId, required this.userName});
+  const CreateTaskScreen(
+      {super.key, required this.userId, required this.userName});
 
   @override
   State<CreateTaskScreen> createState() => _CreateTaskScreenState();
@@ -21,10 +22,17 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   final TextEditingController _budgetController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   String _selectedCategory = 'General';
+  DateTime? _selectedDeadline;
 
   bool _isLoading = false;
 
-  final List<String> _categories = ['General', 'Plumbing', 'Tutoring', 'IT Support', 'Cleaning'];
+  final List<String> _categories = [
+    'General',
+    'Plumbing',
+    'Tutoring',
+    'IT Support',
+    'Cleaning'
+  ];
 
   @override
   void dispose() {
@@ -33,6 +41,19 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     _budgetController.dispose();
     _locationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickDeadline() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 3)),
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 1, now.month, now.day),
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDeadline = picked);
+    }
   }
 
   void _publishTask() async {
@@ -53,6 +74,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         posterId: widget.userId,
         posterName: widget.userName,
         createdAt: DateTime.now(),
+        deadline: _selectedDeadline,
       );
 
       await _taskService.createTask(newTask);
@@ -86,13 +108,17 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(labelText: 'Task Title'),
-                validator: (val) => val!.isEmpty ? 'Please enter a task title' : null,
+                validator: (val) =>
+                    val!.isEmpty ? 'Please enter a task title' : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _selectedCategory,
                 decoration: const InputDecoration(labelText: 'Category'),
-                items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
+                items: _categories
+                    .map(
+                        (cat) => DropdownMenuItem(value: cat, child: Text(cat)))
+                    .toList(),
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedCategory = val);
                 },
@@ -102,20 +128,35 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 controller: _budgetController,
                 decoration: const InputDecoration(labelText: 'Budget (ZAR)'),
                 keyboardType: TextInputType.number,
-                validator: (val) => double.tryParse(val ?? '') == null ? 'Enter a valid numeric budget' : null,
+                validator: (val) => double.tryParse(val ?? '') == null
+                    ? 'Enter a valid numeric budget'
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _locationController,
                 decoration: const InputDecoration(labelText: 'Location / Ward'),
-                validator: (val) => val!.isEmpty ? 'Please enter a location' : null,
+                validator: (val) =>
+                    val!.isEmpty ? 'Please enter a location' : null,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: Text(
+                  _selectedDeadline == null
+                      ? 'Select Deadline Date'
+                      : 'Deadline: ${_selectedDeadline!.toLocal().toString().split(' ')[0]}',
+                ),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: _pickDeadline,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descController,
-                decoration: const InputDecoration(labelText: 'Task Description'),
+                decoration:
+                    const InputDecoration(labelText: 'Task Description'),
                 maxLines: 4,
-                validator: (val) => val!.isEmpty ? 'Please enter a description' : null,
+                validator: (val) =>
+                    val!.isEmpty ? 'Please enter a description' : null,
               ),
               const SizedBox(height: 24),
               _isLoading
