@@ -10,10 +10,11 @@ class TaskModel {
   final String posterId;
   final String posterName;
   String status; // 'Open', 'In Progress', 'Completed'
-  final String? assignedProvider;
   final String? completionNote;
   final DateTime createdAt;
   final DateTime? deadline;
+  final String? assignedProviderId;
+final String? assignedProviderName;
 
   TaskModel({
     required this.id,
@@ -25,10 +26,11 @@ class TaskModel {
     required this.posterId,
     required this.posterName,
     this.status = 'Open',
-    this.assignedProvider,
     this.completionNote,
     required this.createdAt,
     this.deadline,
+    this.assignedProviderId,
+    this.assignedProviderName,
   });
 
   Map<String, dynamic> toMap() {
@@ -42,10 +44,11 @@ class TaskModel {
       'posterId': posterId,
       'posterName': posterName,
       'status': status,
-      'assignedProvider': assignedProvider,
       'completionNote': completionNote,
       'createdAt': createdAt.toIso8601String(),
       'deadline': deadline != null ? Timestamp.fromDate(deadline!) : null,
+      'assignedProviderId': assignedProviderId,
+      'assignedProviderName': assignedProviderName,
     };
   }
 
@@ -60,7 +63,8 @@ class TaskModel {
       posterId: map['posterId'] ?? '',
       posterName: map['posterName'] ?? '',
       status: map['status'] ?? 'Open',
-      assignedProvider: map['assignedProvider'],
+      assignedProviderId: map['assignedProviderId'],
+      assignedProviderName: map['assignedProviderName'],
       completionNote: map['completionNote'],
       createdAt:
           DateTime.parse(map['createdAt'] ?? DateTime.now().toIso8601String()),

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/task_model.dart';
 import '../local/sqlite_helper.dart';
+import '../../models/bid_model.dart';
 
 class TaskService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -27,6 +28,15 @@ class TaskService {
   // Delete/Cancel an eligible task
   Future<void> deleteTask(String taskId) async {
     await _firestore.collection('tasks').doc(taskId).delete();
+  }
+
+  Future<void> acceptBid({required String taskId, required BidModel winningBid}) async {
+  // Update task status and assign the provider UID + Name
+    await _firestore.collection('tasks').doc(taskId).update({
+      'status': 'In Progress',
+      'assignedProviderId': winningBid.providerId, // Secure UID
+      'assignedProviderName': winningBid.providerName, // Display Name
+    });
   }
 
   // Update task operational status (e.g., 'In Progress' -> 'Completed')
