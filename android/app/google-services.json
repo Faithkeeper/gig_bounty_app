@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "304884079525",
+    "project_id": "gigbountyapp",
+    "storage_bucket": "gigbountyapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:304884079525:android:813cd20a9d0943746a264c",
+        "android_client_info": {
+          "package_name": "com.example.gig_bounty_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAg6FMRsNQAnHWKPyB15cI4RNAx_FREr8w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
