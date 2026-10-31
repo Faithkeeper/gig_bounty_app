@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../../models/task_model.dart';
+import '../../models/user_profile.dart';
 
 class SqliteHelper {
   static final SqliteHelper instance = SqliteHelper._init();
@@ -73,6 +74,17 @@ class SqliteHelper {
         );
       }
     }
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS user_profile (
+        uid TEXT PRIMARY KEY,
+        email TEXT,
+        fullName TEXT,
+        role TEXT,
+        rating REAL,
+        jobsCompleted INTEGER
+      )
+    ''' );
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -93,9 +105,19 @@ class SqliteHelper {
         createdAt TEXT,
         deadline TEXT
       )
-    ''');
+    ''' );
 
-    // Offline actions sync queue table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS user_profile (
+        uid TEXT PRIMARY KEY,
+        email TEXT,
+        fullName TEXT,
+        role TEXT,
+        rating REAL,
+        jobsCompleted INTEGER
+      )
+    ''' );
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS sync_queue (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,7 +125,7 @@ class SqliteHelper {
         payload TEXT,
         timestamp TEXT
       )
-    ''');
+    ''' );
   }
 
   // Cache tasks locally for offline reading
@@ -165,6 +187,24 @@ class SqliteHelper {
       }).toList();
     }
     return [];
+  }
+
+  Future<void> cacheUserProfile(UserProfile profile) async {
+    final db = await database;
+    await db.insert(
+      'user_profile',
+      profile.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<UserProfile?> getCachedUserProfile() async {
+    final db = await database;
+    final result = await db.query('user_profile', limit: 1);
+    if (result.isNotEmpty) {
+      return UserProfile.fromMap(result.first.map((key, value) => MapEntry(key, value)));
+    }
+    return null;
   }
 
   // Store offline actions in the queue if connectivity drops

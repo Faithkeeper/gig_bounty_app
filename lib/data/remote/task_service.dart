@@ -1,14 +1,20 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/task_model.dart';
 import '../local/sqlite_helper.dart';
 import '../../models/bid_model.dart';
+import 'sync_service.dart';
 
 class TaskService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Stream real-time tasks, caching Firestore results for offline reading.
   Stream<List<TaskModel>> getTasks() {
-    return _firestore.collection('tasks').snapshots().asyncMap((snapshot) async {
+    return _firestore
+        .collection('tasks')
+        .snapshots()
+        .asyncMap((snapshot) async {
       try {
         final tasks = snapshot.docs
             .map((doc) => TaskModel.fromMap(doc.data(), id: doc.id))
@@ -23,7 +29,25 @@ class TaskService {
 
   // Publish a new task to Firestore
   Future<void> createTask(TaskModel task) async {
-    await _firestore.collection('tasks').doc(task.id).set(task.toMap());
+    final taskReference =
+        _firestore.collection('tasks').doc(task.id.isEmpty ? null : task.id);
+    final taskData = task.toMap()..['id'] = taskReference.id;
+
+    try {
+      // Try online write first
+      await taskReference.set(taskData);
+    } catch (e) {
+      // If offline, queue action locally
+      final payload = Map<String, dynamic>.from(taskData)
+        ..['createdAt'] = task.createdAt.toIso8601String()
+        ..['deadline'] = task.deadline?.toIso8601String();
+      await SqliteHelper.instance.queueOfflineAction(
+        'CREATE_TASK',
+        jsonEncode(payload),
+      );
+    }
+    // Attempt background sync check
+    await SyncService().processSyncQueue();
   }
 
   // Delete/Cancel an eligible task
@@ -31,8 +55,9 @@ class TaskService {
     await _firestore.collection('tasks').doc(taskId).delete();
   }
 
-  Future<void> acceptBid({required String taskId, required BidModel winningBid}) async {
-  // Update task status and assign the provider UID + Name
+  Future<void> acceptBid(
+      {required String taskId, required BidModel winningBid}) async {
+    // Update task status and assign the provider UID + Name
     await _firestore.collection('tasks').doc(taskId).update({
       'status': 'In Progress',
       'assignedProviderId': winningBid.providerId, // Secure UID
@@ -41,14 +66,14 @@ class TaskService {
   }
 
   Future<void> rejectBid(String bidId) async {
-  try {
-    await _firestore.collection('bids').doc(bidId).update({
-      'status': 'Rejected',
-    });
-  } catch (e) {
-    throw Exception('Failed to reject bid: ${e.toString()}');
+    try {
+      await _firestore.collection('bids').doc(bidId).update({
+        'status': 'Rejected',
+      });
+    } catch (e) {
+      throw Exception('Failed to reject bid: ${e.toString()}');
+    }
   }
-}
 
   // Update task operational status (e.g., 'In Progress' -> 'Completed')
   Future<void> updateTaskStatus(String taskId, String newStatus,
@@ -62,39 +87,37 @@ class TaskService {
 
   // Fetch task history for a specific user (as poster or assigned provider)
   Future<List<TaskModel>> getUserTaskHistory(String userId) async {
-  try {
-    // Fetch tasks where user is customer
-    final customerQuery = await _firestore
-        .collection('tasks')
-        .where('customerId', isEqualTo: userId)
-        .where('status', whereIn: ['Completed', 'Cancelled'])
-        .get();
+    try {
+      // Fetch tasks where user is customer
+      final customerQuery = await _firestore
+          .collection('tasks')
+          .where('posterId', isEqualTo: userId)
+          .where('status', whereIn: ['Completed', 'Cancelled']).get();
 
-    // Fetch tasks where user is assigned service provider
-    final providerQuery = await _firestore
-        .collection('tasks')
-        .where('assignedProviderId', isEqualTo: userId)
-        .where('status', whereIn: ['Completed', 'Cancelled'])
-        .get();
+      // Fetch tasks where user is assigned service provider
+      final providerQuery = await _firestore
+          .collection('tasks')
+          .where('assignedProviderId', isEqualTo: userId)
+          .where('status', whereIn: ['Completed', 'Cancelled']).get();
 
-    final Map<String, TaskModel> taskMap = {};
+      final Map<String, TaskModel> taskMap = {};
 
-    for (var doc in customerQuery.docs) {
-      taskMap[doc.id] = TaskModel.fromMap(doc.data(), id: doc.id);
+      for (var doc in customerQuery.docs) {
+        taskMap[doc.id] = TaskModel.fromMap(doc.data(), id: doc.id);
+      }
+      for (var doc in providerQuery.docs) {
+        taskMap[doc.id] = TaskModel.fromMap(doc.data(), id: doc.id);
+      }
+
+      // Sort by creation date descending
+      final tasks = taskMap.values.toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return tasks;
+    } catch (e) {
+      throw Exception('Failed to load task history: ${e.toString()}');
     }
-    for (var doc in providerQuery.docs) {
-      taskMap[doc.id] = TaskModel.fromMap(doc.data(), id: doc.id);
-    }
-
-    // Sort by creation date descending
-    final tasks = taskMap.values.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    return tasks;
-  } catch (e) {
-    throw Exception('Failed to load task history: ${e.toString()}');
   }
-}
 
   Future<void> updateTaskDetails({
     required String taskId,
