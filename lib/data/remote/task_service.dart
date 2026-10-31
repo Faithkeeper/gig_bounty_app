@@ -55,15 +55,21 @@ class TaskService {
     await _firestore.collection('tasks').doc(taskId).delete();
   }
 
-  Future<void> acceptBid(
-      {required String taskId, required BidModel winningBid}) async {
-    // Update task status and assign the provider UID + Name
+ Future<void> acceptBid({required String taskId, required BidModel winningBid}) async {
     await _firestore.collection('tasks').doc(taskId).update({
       'status': 'In Progress',
-      'assignedProviderId': winningBid.providerId, // Secure UID
-      'assignedProviderName': winningBid.providerName, // Display Name
+      'assignedProviderId': winningBid.providerId,
+      'assignedProviderName': winningBid.providerName,
     });
-  }
+
+  // Optional: Record notification event for target user
+  await _firestore.collection('notifications').add({
+    'userId': winningBid.providerId,
+    'title': 'Bid Accepted!',
+    'body': 'Your bid was accepted. Get to work!',
+    'timestamp': FieldValue.serverTimestamp(),
+  });
+}
 
   Future<void> rejectBid(String bidId) async {
     try {

@@ -44,14 +44,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('Profile updated successfully!'),
+                backgroundColor: Colors.green),
           );
           Navigator.pop(context, true); // Return true to indicate update
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating profile: ${e.toString()}'), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('Error updating profile: ${e.toString()}'),
+                backgroundColor: Colors.red),
           );
         }
       } finally {
@@ -82,14 +86,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 widget.userProfile.email,
                 style: const TextStyle(fontSize: 16, color: Colors.grey),
               ),
-              const SizedBox(height: 32),
+              Card(
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(vertical: 16),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          const Text(
+                            'Rating',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '⭐ ${widget.userProfile.rating.toStringAsFixed(1)}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const VerticalDivider(),
+                      Column(
+                        children: [
+                          const Text(
+                            'Jobs Completed',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${widget.userProfile.jobsCompleted}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
                   labelText: 'Full Name',
                   border: OutlineInputBorder(),
                 ),
-                validator: (val) => val == null || val.isEmpty ? 'Please enter your name' : null,
+                validator: (val) => val == null || val.isEmpty
+                    ? 'Please enter your name'
+                    : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
@@ -99,7 +150,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   border: OutlineInputBorder(),
                 ),
                 items: ['Customer', 'Service Provider']
-                    .map((role) => DropdownMenuItem(value: role, child: Text(role)))
+                    .map((role) =>
+                        DropdownMenuItem(value: role, child: Text(role)))
                     .toList(),
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedRole = val);
@@ -117,7 +169,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           backgroundColor: Colors.deepOrange,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Save Changes', style: TextStyle(fontSize: 16)),
+                        child: const Text('Save Changes',
+                            style: TextStyle(fontSize: 16)),
                       ),
               ),
             ],
