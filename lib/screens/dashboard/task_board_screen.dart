@@ -6,6 +6,7 @@ import '../task/create_task_screen.dart';
 import '../../data/remote/auth_service.dart';
 import '../task/task_details_screen.dart';
 import '../profile/profile_screen.dart';
+import '../task/task_history_screen.dart';
 
 class TaskBoardScreen extends StatefulWidget {
   final UserProfile userProfile;
@@ -39,6 +40,18 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
               if (updated == true) {
                 setState(() {}); // Refresh state if profile was updated
               }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Task History',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TaskHistoryScreen(userProfile: widget.userProfile),
+                ),
+              );
             },
           ),
           IconButton(

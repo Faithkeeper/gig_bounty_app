@@ -52,9 +52,9 @@ final String? assignedProviderName;
     };
   }
 
-  factory TaskModel.fromMap(Map<String, dynamic> map) {
+  factory TaskModel.fromMap(Map<String, dynamic> map, {String? id}) {
     return TaskModel(
-      id: map['id'] ?? '',
+      id: id ?? map['id'] ?? '',
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       category: map['category'] ?? 'General',

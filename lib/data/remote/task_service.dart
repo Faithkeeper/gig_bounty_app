@@ -10,8 +10,9 @@ class TaskService {
   Stream<List<TaskModel>> getTasks() {
     return _firestore.collection('tasks').snapshots().asyncMap((snapshot) async {
       try {
-        final tasks =
-            snapshot.docs.map((doc) => TaskModel.fromMap(doc.data())).toList();
+        final tasks = snapshot.docs
+            .map((doc) => TaskModel.fromMap(doc.data(), id: doc.id))
+            .toList();
         await SqliteHelper.instance.cacheTasks(tasks);
         return tasks;
       } catch (_) {
@@ -60,14 +61,40 @@ class TaskService {
   }
 
   // Fetch task history for a specific user (as poster or assigned provider)
-  Stream<List<TaskModel>> getUserTaskHistory(String userId) {
-    return _firestore.collection('tasks').snapshots().map((snapshot) {
-      return snapshot.docs
-          .map((doc) => TaskModel.fromMap(doc.data()))
-          .where((task) => task.posterId == userId || task.status == 'Completed')
-          .toList();
-    });
+  Future<List<TaskModel>> getUserTaskHistory(String userId) async {
+  try {
+    // Fetch tasks where user is customer
+    final customerQuery = await _firestore
+        .collection('tasks')
+        .where('customerId', isEqualTo: userId)
+        .where('status', whereIn: ['Completed', 'Cancelled'])
+        .get();
+
+    // Fetch tasks where user is assigned service provider
+    final providerQuery = await _firestore
+        .collection('tasks')
+        .where('assignedProviderId', isEqualTo: userId)
+        .where('status', whereIn: ['Completed', 'Cancelled'])
+        .get();
+
+    final Map<String, TaskModel> taskMap = {};
+
+    for (var doc in customerQuery.docs) {
+      taskMap[doc.id] = TaskModel.fromMap(doc.data(), id: doc.id);
+    }
+    for (var doc in providerQuery.docs) {
+      taskMap[doc.id] = TaskModel.fromMap(doc.data(), id: doc.id);
+    }
+
+    // Sort by creation date descending
+    final tasks = taskMap.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return tasks;
+  } catch (e) {
+    throw Exception('Failed to load task history: ${e.toString()}');
   }
+}
 
   Future<void> updateTaskDetails({
     required String taskId,
