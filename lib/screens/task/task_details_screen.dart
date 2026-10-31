@@ -48,36 +48,41 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           maxLines: 3,
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final navigator = Navigator.of(dialogContext);
-              final messenger = ScaffoldMessenger.maybeOf(dialogContext);
-              await _taskService.updateTaskStatus(
-                widget.task.id,
-                'Completed',
-                completionNote: _completionNoteController.text.trim(),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final navigator = Navigator.of(dialogContext);
+            final messenger = ScaffoldMessenger.maybeOf(dialogContext);
+            
+            await _taskService.updateTaskStatus(
+              widget.task.id,
+              'Completed',
+              completionNote: _completionNoteController.text.trim(),
+            );
+
+            if (!mounted) return;
+            
+            // Safely pop just the dialog once
+            if (navigator.canPop()) {
+              navigator.pop();
+            }
+
+            if (messenger != null) {
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text('Task marked as Completed!'),
+                  backgroundColor: Colors.green,
+                ),
               );
-              if (!mounted) return;
-              if (navigator.mounted) {
-                navigator.pop();
-                navigator.pop();
-              }
-              if (messenger != null) {
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Task marked as Completed!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Confirm Completion'),
-          ),
-        ],
+            }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          child: const Text('Confirm Completion'),
+        ),
+],
       ),
     );
   }

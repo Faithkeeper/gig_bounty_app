@@ -6,12 +6,17 @@ import 'data/remote/auth_service.dart';
 import 'screens/auth/auth_screen.dart';
 import 'models/user_profile.dart';
 import 'screens/dashboard/task_board_screen.dart';
+import 'data/remote/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize FCM / local notifications safely
+  await FcmService().initNotifications();
+
   runApp(const GigBountyApp());
 }
 

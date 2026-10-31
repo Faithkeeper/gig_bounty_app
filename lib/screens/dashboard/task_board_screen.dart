@@ -18,8 +18,22 @@ class TaskBoardScreen extends StatefulWidget {
 
 class _TaskBoardScreenState extends State<TaskBoardScreen> {
   final TaskService _taskService = TaskService();
+  late final Stream<List<TaskModel>> _tasksStream;
   String _selectedFilter = 'All';
-  final List<String> _filterCategories = ['All', 'General', 'Plumbing', 'Tutoring', 'IT Support', 'Cleaning'];
+  final List<String> _filterCategories = [
+    'All',
+    'General',
+    'Plumbing',
+    'Tutoring',
+    'IT Support',
+    'Cleaning'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tasksStream = _taskService.getTasks();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,11 +48,12 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
               final updated = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ProfileScreen(userProfile: widget.userProfile),
+                  builder: (context) =>
+                      ProfileScreen(userProfile: widget.userProfile),
                 ),
               );
-              if (updated == true) {
-                setState(() {}); // Refresh state if profile was updated
+              if (updated == true && mounted) {
+                setState(() {});
               }
             },
           ),
@@ -49,7 +64,8 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => TaskHistoryScreen(userProfile: widget.userProfile),
+                  builder: (context) =>
+                      TaskHistoryScreen(userProfile: widget.userProfile),
                 ),
               );
             },
@@ -77,7 +93,11 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
                   child: ChoiceChip(
                     label: Text(cat),
                     selected: _selectedFilter == cat,
-                    onSelected: (selected) => setState(() => _selectedFilter = cat),
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() => _selectedFilter = cat);
+                      }
+                    },
                   ),
                 );
               },
@@ -86,21 +106,24 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
           // Live Task Stream from Firestore
           Expanded(
             child: StreamBuilder<List<TaskModel>>(
-              stream: _taskService.getTasks(),
+              stream: _tasksStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('No community tasks available right now.'));
+                  return const Center(
+                      child: Text('No community tasks available right now.'));
                 }
 
                 final tasks = snapshot.data!.where((task) {
-                  return _selectedFilter == 'All' || task.category == _selectedFilter;
+                  return _selectedFilter == 'All' ||
+                      task.category == _selectedFilter;
                 }).toList();
 
                 if (tasks.isEmpty) {
-                  return const Center(child: Text('No tasks found for this category.'));
+                  return const Center(
+                      child: Text('No tasks found for this category.'));
                 }
 
                 return ListView.builder(
@@ -111,7 +134,8 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
                     return Card(
                       elevation: 2,
                       margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       child: ListTile(
                         onTap: () {
                           // Navigate to Task Details & Bidding screen when clicked!
@@ -125,19 +149,28 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
                             ),
                           );
                         },
-                        title: Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(task.title,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 4),
                             Text('${task.category} • ${task.location}'),
                             const SizedBox(height: 4),
-                            Text('Budget: R${task.budget.toStringAsFixed(2)}', style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold)),
+                            Text('Budget: R${task.budget.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    color: Colors.deepOrange,
+                                    fontWeight: FontWeight.bold)),
                           ],
                         ),
                         trailing: Chip(
-                          label: Text(task.status, style: const TextStyle(fontSize: 10, color: Colors.white)),
-                          backgroundColor: task.status == 'Open' ? Colors.green : Colors.grey,
+                          label: Text(task.status,
+                              style: const TextStyle(
+                                  fontSize: 10, color: Colors.white)),
+                          backgroundColor: task.status == 'Open'
+                              ? Colors.green
+                              : Colors.grey,
                         ),
                       ),
                     );
