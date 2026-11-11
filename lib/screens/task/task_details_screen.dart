@@ -215,114 +215,104 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
   }
 
-  Future<void> _showEditTaskDialog(BuildContext context) async {
-    final titleController = TextEditingController(text: widget.task.title);
-    final descriptionController =
-        TextEditingController(text: widget.task.description);
+  Future<void> _showEditTaskDialog(BuildContext context, TaskModel task) async {
+    final titleController = TextEditingController(text: task.title);
+    final descriptionController = TextEditingController(text: task.description);
     final budgetController =
-        TextEditingController(text: widget.task.budget.toString());
-    final locationController =
-        TextEditingController(text: widget.task.location);
+        TextEditingController(text: task.budget.toString());
+    final locationController = TextEditingController(text: task.location);
     final formKey = GlobalKey<FormState>();
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.maybeOf(context);
 
-    try {
-      final updated = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Edit Task'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Task Title'),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter a task title'
-                        : null,
-                  ),
-                  TextFormField(
-                    controller: descriptionController,
-                    decoration: const InputDecoration(labelText: 'Description'),
-                    maxLines: 3,
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter a description'
-                        : null,
-                  ),
-                  TextFormField(
-                    controller: budgetController,
-                    decoration:
-                        const InputDecoration(labelText: 'Budget (ZAR)'),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    validator: (value) {
-                      final budget = double.tryParse(value?.trim() ?? '');
-                      return budget == null || budget <= 0
-                          ? 'Enter a valid budget'
-                          : null;
-                    },
-                  ),
-                  TextFormField(
-                    controller: locationController,
-                    decoration:
-                        const InputDecoration(labelText: 'Location / Ward'),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter a location'
-                        : null,
-                  ),
-                ],
-              ),
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit Task'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: 'Task Title'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a task title'
+                      : null,
+                ),
+                TextFormField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                  maxLines: 3,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a description'
+                      : null,
+                ),
+                TextFormField(
+                  controller: budgetController,
+                  decoration: const InputDecoration(labelText: 'Budget (ZAR)'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    final budget = double.tryParse(value?.trim() ?? '');
+                    return budget == null || budget <= 0
+                        ? 'Enter a valid budget'
+                        : null;
+                  },
+                ),
+                TextFormField(
+                  controller: locationController,
+                  decoration:
+                      const InputDecoration(labelText: 'Location / Ward'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a location'
+                      : null,
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState?.validate() != true) return;
-                try {
-                  await _taskService.updateTaskDetails(
-                    taskId: widget.task.id,
-                    title: titleController.text.trim(),
-                    description: descriptionController.text.trim(),
-                    budget: double.parse(budgetController.text.trim()),
-                    location: locationController.text.trim(),
-                    deadline: widget.task.deadline,
-                  );
-                  if (dialogContext.mounted) {
-                    Navigator.pop(dialogContext, true);
-                  }
-                } catch (error) {
-                  if (dialogContext.mounted) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      SnackBar(content: Text('Error updating task: $error')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Save Changes'),
-            ),
-          ],
         ),
-      );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() != true) return;
+              try {
+                await _taskService.updateTaskDetails(
+                  taskId: task.id,
+                  title: titleController.text.trim(),
+                  description: descriptionController.text.trim(),
+                  budget: double.parse(budgetController.text.trim()),
+                  location: locationController.text.trim(),
+                  deadline: task.deadline,
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
+              } catch (error) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Error updating task: $error')),
+                  );
+                }
+              }
+            },
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
 
-      if (updated == true && mounted) {
-        if (navigator.mounted) navigator.pop(true);
-        messenger?.showSnackBar(
-          const SnackBar(content: Text('Task updated successfully.')),
-        );
-      }
-    } finally {
-      titleController.dispose();
-      descriptionController.dispose();
-      budgetController.dispose();
-      locationController.dispose();
+    if (updated == true && mounted) {
+      if (navigator.mounted) navigator.pop(true);
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('Task updated successfully.')),
+      );
     }
   }
 
@@ -450,7 +440,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.edit, color: Colors.blue),
                       label: const Text('Edit Task'),
-                      onPressed: () => _showEditTaskDialog(context),
+                      onPressed: () =>
+                          _showEditTaskDialog(context, widget.task),
                     ),
                   ),
                   const SizedBox(width: 16),
