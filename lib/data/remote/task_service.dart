@@ -148,6 +148,14 @@ class TaskService {
       };
       transaction.update(taskRef, updates);
 
+      if (newStatus == 'Completed' && assignedProviderId != null) {
+        final providerRef =
+            _firestore.collection('users').doc(assignedProviderId);
+        transaction.update(providerRef, {
+          'jobsCompleted': FieldValue.increment(1),
+        });
+      }
+
       if (contractRef != null && contractSnapshot?.exists == true) {
         transaction.update(contractRef, {
           'status': 'Completed',

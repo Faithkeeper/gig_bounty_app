@@ -4,33 +4,38 @@ import '../../models/review_model.dart';
 class ReviewService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Submit a review and recalculate provider reputation metrics
+  // Submit a review and recalculate the reviewee's average rating.
   Future<void> submitReview(ReviewModel review) async {
     final reviewRef = _firestore.collection('reviews').doc(review.id);
     final userRef = _firestore.collection('users').doc(review.revieweeId);
+    final reviewsSnap = await _firestore
+        .collection('reviews')
+        .where('revieweeId', isEqualTo: review.revieweeId)
+        .get();
+    final userSnapshot = await userRef.get();
+    final existingReviewSnapshot = await reviewRef.get();
 
-    await _firestore.runTransaction((transaction) async {
-      // 1. Save the review document
-      transaction.set(reviewRef, review.toMap());
+    var totalRating = review.rating;
+    var count = 1;
 
-      // 2. Fetch current user profile metrics
-      final userSnapshot = await transaction.get(userRef);
-      if (userSnapshot.exists) {
-        final data = userSnapshot.data() as Map<String, dynamic>;
-        double currentRating = (data['rating'] ?? 0.0).toDouble();
-        int jobsCompleted = (data['jobsCompleted'] ?? 0) as int;
-
-        // Calculate new weighted rating and increment jobs completed
-        int newJobsCount = jobsCompleted + 1;
-        double newRating = ((currentRating * jobsCompleted) + review.rating) / newJobsCount;
-
-        // 3. Update user profile with new reputation score
-        transaction.update(userRef, {
-          'rating': newRating,
-          'jobsCompleted': newJobsCount,
-        });
+    for (final doc in reviewsSnap.docs) {
+      if (doc.id != review.id) {
+        totalRating += (doc.data()['rating'] ?? 0.0).toDouble();
+        count++;
       }
-    });
+    }
+
+    final batch = _firestore.batch()..set(reviewRef, review.toMap());
+
+    if (userSnapshot.exists) {
+      batch.update(userRef, {
+        'rating': totalRating / count,
+        if (!existingReviewSnapshot.exists)
+          'jobsCompleted': FieldValue.increment(1),
+      });
+    }
+
+    await batch.commit();
   }
 
   // Stream reviews for a specific user/provider
@@ -40,7 +45,9 @@ class ReviewService {
         .where('revieweeId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => ReviewModel.fromMap(doc.data())).toList();
+      return snapshot.docs
+          .map((doc) => ReviewModel.fromMap(doc.data()))
+          .toList();
     });
   }
 }

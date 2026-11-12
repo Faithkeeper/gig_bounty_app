@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../data/remote/auth_service.dart';
+import '../../data/remote/review_service.dart';
+import '../../models/review_model.dart';
 import '../../models/task_model.dart';
 
 class SubmitReviewScreen extends StatefulWidget {
@@ -17,26 +19,46 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
   bool _isLoading = false;
 
   void _submitReview() async {
+    final reviewerId = AuthService().currentUser?.uid;
+    final revieweeId = widget.task.assignedProviderId;
+    if (reviewerId == null || revieweeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('A signed-in reviewer and assigned provider are required.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      await FirebaseFirestore.instance.collection('reviews').add({
-        'taskId': widget.task.id,
-        'providerId': widget.task.assignedProviderId,
-        'rating': _rating,
-        'comment': _commentController.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      final review = ReviewModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        taskId: widget.task.id,
+        reviewerId: reviewerId,
+        revieweeId: revieweeId,
+        rating: _rating,
+        comment: _commentController.text.trim(),
+        createdAt: DateTime.now(),
+      );
+      await ReviewService().submitReview(review);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Review submitted successfully!'), backgroundColor: Colors.green),
+          const SnackBar(
+              content: Text('Review submitted successfully!'),
+              backgroundColor: Colors.green),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -53,7 +75,8 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
         child: Column(
           children: [
             Text('Rate ${widget.task.assignedProviderName ?? "Provider"}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -64,7 +87,8 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
                     color: Colors.amber,
                     size: 36,
                   ),
-                  onPressed: () => setState(() => _rating = (index + 1).toDouble()),
+                  onPressed: () =>
+                      setState(() => _rating = (index + 1).toDouble()),
                 );
               }),
             ),
@@ -89,7 +113,8 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
                         backgroundColor: Colors.deepOrange,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('Submit Review', style: TextStyle(fontSize: 16)),
+                      child: const Text('Submit Review',
+                          style: TextStyle(fontSize: 16)),
                     ),
             ),
           ],

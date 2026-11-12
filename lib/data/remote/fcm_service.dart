@@ -1,3 +1,6 @@
+import 'dart:developer' as developer;
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -5,6 +8,29 @@ class FcmService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
+
+  Future<void> initializeFCMToken(String userId) async {
+    try {
+      // This field stores the FCM token consumed by existing notification senders.
+      // ignore: deprecated_member_use
+      final token = await _fcm.getToken();
+      if (token != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .update({
+          'fcmToken': token,
+        });
+      }
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to initialize the FCM token for user $userId.',
+        name: 'FcmService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
 
   Future<void> initNotifications() async {
     await _fcm.requestPermission(

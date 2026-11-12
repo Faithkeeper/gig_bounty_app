@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -37,15 +39,28 @@ class GigBountyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final AuthService authService = AuthService();
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
 
+class _AuthWrapperState extends State<AuthWrapper> {
+  final AuthService _authService = AuthService();
+  final FcmService _fcmService = FcmService();
+  String? _tokenRegisteredUserId;
+
+  void _initializeFCMToken(String userId) {
+    if (_tokenRegisteredUserId == userId) return;
+    _tokenRegisteredUserId = userId;
+    unawaited(_fcmService.initializeFCMToken(userId));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: authService.authStateChanges,
+      stream: _authService.authStateChanges,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -53,11 +68,11 @@ class AuthWrapper extends StatelessWidget {
           );
         }
         if (snapshot.hasData) {
-          final uid = authService.currentUser!.uid;
+          final uid = _authService.currentUser!.uid;
 
           // Fetch user profile and pass it to the full TaskBoardScreen
           return FutureBuilder<UserProfile?>(
-            future: authService.getUserProfile(uid),
+            future: _authService.getUserProfile(uid),
             builder: (context, profileSnapshot) {
               if (profileSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
@@ -73,7 +88,7 @@ class AuthWrapper extends StatelessWidget {
                         const Text('Error loading user profile from database.'),
                         const SizedBox(height: 16),
                         ElevatedButton(
-                          onPressed: () => authService.signOut(),
+                          onPressed: () => _authService.signOut(),
                           child: const Text('Sign Out'),
                         ),
                       ],
@@ -83,10 +98,12 @@ class AuthWrapper extends StatelessWidget {
               }
 
               // Route straight to the live marketplace dashboard!
+              _initializeFCMToken(uid);
               return TaskBoardScreen(userProfile: profileSnapshot.data!);
             },
           );
         }
+        _tokenRegisteredUserId = null;
         return const AuthScreen();
       },
     );
