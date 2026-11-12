@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/task_model.dart';
 import '../local/sqlite_helper.dart';
@@ -41,9 +39,10 @@ class TaskService {
       final payload = Map<String, dynamic>.from(taskData)
         ..['createdAt'] = task.createdAt.toIso8601String()
         ..['deadline'] = task.deadline?.toIso8601String();
-      await SqliteHelper.instance.queueOfflineAction(
-        'CREATE_TASK',
-        jsonEncode(payload),
+      await SqliteHelper.instance.queueOfflineMutation(
+        actionType: 'CREATE_TASK',
+        documentId: taskReference.id,
+        payload: payload,
       );
     }
     // Attempt background sync check

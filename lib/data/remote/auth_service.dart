@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/user_profile.dart';
+import '../local/sqlite_helper.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -61,17 +63,25 @@ class AuthService {
     await _auth.signOut();
   }
 
-  // Fetch user profile data from Firestore
-  Future<UserProfile?> getUserProfile(String uid) async {
+  // Fetch user profile data from Firestore, falling back to the local cache.
+  Future<UserProfile> getUserProfile(String uid) async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
+      final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
-        return UserProfile.fromMap(doc.data() as Map<String, dynamic>);
+        final profile = UserProfile.fromMap(doc.data()!);
+        await SqliteHelper.instance.cacheUserProfile(profile);
+        return profile;
       }
-      return null;
     } catch (e) {
-      rethrow;
+      debugPrint('Network fetch failed, falling back to local cache: $e');
     }
+
+    final cachedProfile = await SqliteHelper.instance.getCachedUserProfile(uid);
+    if (cachedProfile != null) {
+      return cachedProfile;
+    }
+
+    throw Exception('No profile found online or in local cache.');
   }
 
   Future<void> updateUserProfile({

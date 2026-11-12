@@ -7,12 +7,15 @@ import 'screens/auth/auth_screen.dart';
 import 'models/user_profile.dart';
 import 'screens/dashboard/task_board_screen.dart';
 import 'data/remote/fcm_service.dart';
+import 'data/remote/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  SyncService().initializeSyncListener();
 
   // Initialize FCM / local notifications safely
   await FcmService().initNotifications();
@@ -51,7 +54,7 @@ class AuthWrapper extends StatelessWidget {
         }
         if (snapshot.hasData) {
           final uid = authService.currentUser!.uid;
-          
+
           // Fetch user profile and pass it to the full TaskBoardScreen
           return FutureBuilder<UserProfile?>(
             future: authService.getUserProfile(uid),

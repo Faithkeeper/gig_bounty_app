@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../../models/task_model.dart';
@@ -21,7 +23,7 @@ class SqliteHelper {
 
     return await openDatabase(
       fullPath,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: (db, oldVersion, newVersion) async {
         await _migrateTasksTable(db);
@@ -85,6 +87,28 @@ class SqliteHelper {
         jobsCompleted INTEGER
       )
     ''' );
+
+    await _migrateSyncQueueTable(db);
+  }
+
+  Future<void> _migrateSyncQueueTable(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(sync_queue)');
+    final existingColumns =
+        columns.map((column) => column['name'] as String).toSet();
+
+    if (existingColumns.isEmpty) {
+      await db.execute('''
+        CREATE TABLE sync_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          actionType TEXT,
+          documentId TEXT,
+          payload TEXT,
+          timestamp TEXT
+        )
+      ''' );
+    } else if (!existingColumns.contains('documentId')) {
+      await db.execute('ALTER TABLE sync_queue ADD COLUMN documentId TEXT');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -122,6 +146,7 @@ class SqliteHelper {
       CREATE TABLE IF NOT EXISTS sync_queue (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         actionType TEXT,
+        documentId TEXT,
         payload TEXT,
         timestamp TEXT
       )
@@ -198,9 +223,14 @@ class SqliteHelper {
     );
   }
 
-  Future<UserProfile?> getCachedUserProfile() async {
+  Future<UserProfile?> getCachedUserProfile(String uid) async {
     final db = await database;
-    final result = await db.query('user_profile', limit: 1);
+    final result = await db.query(
+      'user_profile',
+      where: 'uid = ?',
+      whereArgs: [uid],
+      limit: 1,
+    );
     if (result.isNotEmpty) {
       return UserProfile.fromMap(result.first.map((key, value) => MapEntry(key, value)));
     }
@@ -214,6 +244,29 @@ class SqliteHelper {
       'actionType': actionType,
       'payload': payload,
       'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> queueOfflineMutation({
+    required String actionType,
+    required String documentId,
+    required Map<String, dynamic> payload,
+  }) async {
+    await insertSyncQueueItem({
+      'action_type': actionType,
+      'document_id': documentId,
+      'payload': jsonEncode(payload),
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> insertSyncQueueItem(Map<String, Object?> item) async {
+    final db = await database;
+    await db.insert('sync_queue', {
+      'actionType': item['action_type'],
+      'documentId': item['document_id'],
+      'payload': item['payload'],
+      'timestamp': item['created_at'],
     });
   }
 
