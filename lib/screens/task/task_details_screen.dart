@@ -26,10 +26,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       TextEditingController();
 
   bool get _isOwner => widget.task.posterId == widget.userProfile.uid;
+  bool get _canCompleteTask =>
+      widget.task.assignedProviderId == widget.userProfile.uid || _isOwner;
   bool get _isOpen => widget.task.status == 'Open';
 
-  String _formatDate(DateTime date) =>
-      date.toLocal().toString().split(' ')[0];
+  String _formatDate(DateTime date) => date.toLocal().toString().split(' ')[0];
 
   @override
   void dispose() {
@@ -51,41 +52,48 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           maxLines: 3,
         ),
         actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            final navigator = Navigator.of(dialogContext);
-            final messenger = ScaffoldMessenger.maybeOf(dialogContext);
-            
-            await _taskService.updateTaskStatus(
-              widget.task.id,
-              'Completed',
-              completionNote: _completionNoteController.text.trim(),
-            );
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final navigator = Navigator.of(dialogContext);
+              final messenger = ScaffoldMessenger.maybeOf(dialogContext);
+              try {
+                await _taskService.updateTaskStatus(
+                  widget.task.id,
+                  'Completed',
+                  actorUid: widget.userProfile.uid,
+                  completionNote: _completionNoteController.text.trim(),
+                );
 
-            if (!mounted) return;
-            
-            // Safely pop just the dialog once
-            if (navigator.canPop()) {
-              navigator.pop();
-            }
+                if (!mounted) return;
 
-            if (messenger != null) {
-              messenger.showSnackBar(
-                const SnackBar(
-                  content: Text('Task marked as Completed!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-          },
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-          child: const Text('Confirm Completion'),
-        ),
-],
+                if (navigator.canPop()) {
+                  navigator.pop();
+                }
+
+                if (messenger != null) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Task marked as Completed!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (error) {
+                if (dialogContext.mounted && messenger != null) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('Error completing task: $error')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Confirm Completion'),
+          ),
+        ],
       ),
     );
   }
@@ -454,16 +462,19 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Status: In Progress\nAssigned Contractor active',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        'Status: In Progress\nAssigned: ${widget.task.assignedProviderName ?? 'Contractor'}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    ElevatedButton(
-                      onPressed: () => _showCompletionDialog(context),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green),
-                      child: const Text('Mark Complete'),
-                    ),
+                    if (_canCompleteTask)
+                      ElevatedButton(
+                        onPressed: () => _showCompletionDialog(context),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green),
+                        child: const Text('Mark Complete'),
+                      ),
                   ],
                 ),
               ),

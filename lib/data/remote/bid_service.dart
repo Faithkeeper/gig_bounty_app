@@ -25,9 +25,9 @@ class BidService {
     final bidsCollection = _firestore.collection('bids');
     final taskRef = _firestore.collection('tasks').doc(taskId);
     final winningBidRef = bidsCollection.doc(winningBid.id);
-    final otherBidsSnapshot = await bidsCollection
-        .where('taskId', isEqualTo: taskId)
-        .get();
+    final contractRef = _firestore.collection('contracts').doc();
+    final otherBidsSnapshot =
+        await bidsCollection.where('taskId', isEqualTo: taskId).get();
 
     await _firestore.runTransaction((transaction) async {
       final taskSnapshot = await transaction.get(taskRef);
@@ -45,7 +45,8 @@ class BidService {
         throw Exception('Task does not exist.');
       }
 
-      final taskStatus = taskSnapshot.data()?['status'] as String? ?? 'Open';
+      final taskData = taskSnapshot.data()!;
+      final taskStatus = taskData['status'] as String? ?? 'Open';
       if (taskStatus != 'Open') {
         throw Exception('This task is no longer open for bid acceptance.');
       }
@@ -55,10 +56,23 @@ class BidService {
         throw Exception('Winning bid does not exist for this task.');
       }
 
+      transaction.set(contractRef, {
+        'id': contractRef.id,
+        'taskId': taskId,
+        'taskTitle': taskData['title'] ?? '',
+        'posterId': taskData['posterId'] ?? '',
+        'providerId': winningBid.providerId,
+        'providerName': winningBid.providerName,
+        'agreedPrice': winningBid.proposedPrice,
+        'status': 'Active',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
       transaction.update(taskRef, {
         'status': 'In Progress',
         'assignedProviderId': winningBid.providerId,
         'assignedProviderName': winningBid.providerName,
+        'contractId': contractRef.id,
       });
       transaction.update(winningBidRef, {'status': 'Accepted'});
 
@@ -72,6 +86,9 @@ class BidService {
 
   // Reject an individual bid
   Future<void> rejectBid(String bidId) async {
-    await _firestore.collection('bids').doc(bidId).update({'status': 'Rejected'});
+    await _firestore
+        .collection('bids')
+        .doc(bidId)
+        .update({'status': 'Rejected'});
   }
 }

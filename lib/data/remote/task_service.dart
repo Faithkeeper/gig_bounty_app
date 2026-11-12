@@ -76,21 +76,22 @@ class TaskService {
     await batch.commit();
   }
 
- Future<void> acceptBid({required String taskId, required BidModel winningBid}) async {
+  Future<void> acceptBid(
+      {required String taskId, required BidModel winningBid}) async {
     await _firestore.collection('tasks').doc(taskId).update({
       'status': 'In Progress',
       'assignedProviderId': winningBid.providerId,
       'assignedProviderName': winningBid.providerName,
     });
 
-  // Optional: Record notification event for target user
-  await _firestore.collection('notifications').add({
-    'userId': winningBid.providerId,
-    'title': 'Bid Accepted!',
-    'body': 'Your bid was accepted. Get to work!',
-    'timestamp': FieldValue.serverTimestamp(),
-  });
-}
+    // Optional: Record notification event for target user
+    await _firestore.collection('notifications').add({
+      'userId': winningBid.providerId,
+      'title': 'Bid Accepted!',
+      'body': 'Your bid was accepted. Get to work!',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
 
   Future<void> rejectBid(String bidId) async {
     try {
@@ -102,14 +103,59 @@ class TaskService {
     }
   }
 
-  // Update task operational status (e.g., 'In Progress' -> 'Completed')
+  // Update task status and close its contract when completion is authorized.
   Future<void> updateTaskStatus(String taskId, String newStatus,
-      {String? completionNote}) async {
-    final Map<String, dynamic> updateData = {'status': newStatus};
-    if (completionNote != null) {
-      updateData['completionNote'] = completionNote;
-    }
-    await _firestore.collection('tasks').doc(taskId).update(updateData);
+      {required String actorUid, String? completionNote}) async {
+    final taskRef = _firestore.collection('tasks').doc(taskId);
+
+    await _firestore.runTransaction((transaction) async {
+      final taskSnap = await transaction.get(taskRef);
+      if (!taskSnap.exists) {
+        throw Exception('Task not found.');
+      }
+
+      final data = taskSnap.data()!;
+      final currentStatus = data['status'] as String? ?? 'Open';
+      final assignedProviderId = data['assignedProviderId'] as String?;
+      final posterId = data['posterId'] as String?;
+      final contractId = data['contractId'] as String?;
+
+      if (newStatus == 'Completed') {
+        if (currentStatus != 'In Progress') {
+          throw Exception(
+              'Only tasks that are In Progress can be marked Completed.');
+        }
+        if (actorUid != assignedProviderId && actorUid != posterId) {
+          throw Exception(
+              'Unauthorized: Only the assigned provider or task owner can complete this task.');
+        }
+      }
+
+      DocumentReference<Map<String, dynamic>>? contractRef;
+      DocumentSnapshot<Map<String, dynamic>>? contractSnapshot;
+      if (newStatus == 'Completed' &&
+          contractId != null &&
+          contractId.isNotEmpty) {
+        contractRef = _firestore.collection('contracts').doc(contractId);
+        contractSnapshot = await transaction.get(contractRef);
+      }
+
+      final updates = <String, dynamic>{
+        'status': newStatus,
+        if (completionNote != null && completionNote.isNotEmpty)
+          'completionNote': completionNote,
+        if (newStatus == 'Completed')
+          'completedAt': FieldValue.serverTimestamp(),
+      };
+      transaction.update(taskRef, updates);
+
+      if (contractRef != null && contractSnapshot?.exists == true) {
+        transaction.update(contractRef, {
+          'status': 'Completed',
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    });
   }
 
   // Fetch task history for a specific user (as poster or assigned provider)
