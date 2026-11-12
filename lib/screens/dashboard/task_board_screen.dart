@@ -156,7 +156,20 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 4),
-                            Text('${task.category} • ${task.location}'),
+                            Text(
+                              'Category: ${task.category} • ${task.location}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Deadline: ${task.deadline == null ? 'Not set' : task.deadline!.toLocal().toString().split(' ')[0]}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.deepOrange,
+                              ),
+                            ),
                             const SizedBox(height: 4),
                             Text('Budget: R${task.budget.toStringAsFixed(2)}',
                                 style: const TextStyle(

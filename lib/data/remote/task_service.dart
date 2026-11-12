@@ -50,9 +50,30 @@ class TaskService {
     await SyncService().processSyncQueue();
   }
 
-  // Delete/Cancel an eligible task
+  // Delete a task and any bids associated with it.
   Future<void> deleteTask(String taskId) async {
-    await _firestore.collection('tasks').doc(taskId).delete();
+    final bidsSnapshot = await _firestore
+        .collection('bids')
+        .where('taskId', isEqualTo: taskId)
+        .get();
+
+    const maxBidDeletesPerBatch = 499;
+    var start = 0;
+    while (bidsSnapshot.docs.length - start > maxBidDeletesPerBatch) {
+      final batch = _firestore.batch();
+      for (var index = start; index < start + maxBidDeletesPerBatch; index++) {
+        batch.delete(bidsSnapshot.docs[index].reference);
+      }
+      await batch.commit();
+      start += maxBidDeletesPerBatch;
+    }
+
+    final batch = _firestore.batch();
+    for (var index = start; index < bidsSnapshot.docs.length; index++) {
+      batch.delete(bidsSnapshot.docs[index].reference);
+    }
+    batch.delete(_firestore.collection('tasks').doc(taskId));
+    await batch.commit();
   }
 
  Future<void> acceptBid({required String taskId, required BidModel winningBid}) async {

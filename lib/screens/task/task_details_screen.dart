@@ -28,6 +28,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   bool get _isOwner => widget.task.posterId == widget.userProfile.uid;
   bool get _isOpen => widget.task.status == 'Open';
 
+  String _formatDate(DateTime date) =>
+      date.toLocal().toString().split(' ')[0];
+
   @override
   void dispose() {
     _priceController.dispose();
@@ -221,90 +224,140 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     final budgetController =
         TextEditingController(text: task.budget.toString());
     final locationController = TextEditingController(text: task.location);
+    DateTime? selectedDeadline = task.deadline;
     final formKey = GlobalKey<FormState>();
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.maybeOf(context);
 
     final updated = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit Task'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Task Title'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a task title'
-                      : null,
-                ),
-                TextFormField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                  maxLines: 3,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a description'
-                      : null,
-                ),
-                TextFormField(
-                  controller: budgetController,
-                  decoration: const InputDecoration(labelText: 'Budget (ZAR)'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    final budget = double.tryParse(value?.trim() ?? '');
-                    return budget == null || budget <= 0
-                        ? 'Enter a valid budget'
-                        : null;
-                  },
-                ),
-                TextFormField(
-                  controller: locationController,
-                  decoration:
-                      const InputDecoration(labelText: 'Location / Ward'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a location'
-                      : null,
-                ),
-              ],
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Task'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    decoration: const InputDecoration(labelText: 'Task Title'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter a task title'
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(labelText: 'Description'),
+                    maxLines: 3,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter a description'
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: budgetController,
+                    decoration:
+                        const InputDecoration(labelText: 'Budget (ZAR)'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      final budget = double.tryParse(value?.trim() ?? '');
+                      return budget == null || budget <= 0
+                          ? 'Enter a valid budget'
+                          : null;
+                    },
+                  ),
+                  TextFormField(
+                    controller: locationController,
+                    decoration:
+                        const InputDecoration(labelText: 'Location / Ward'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter a location'
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          selectedDeadline == null
+                              ? 'Deadline: Not set'
+                              : 'Deadline: ${_formatDate(selectedDeadline!)}',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final firstDate = DateTime.now();
+                          final lastDate =
+                              firstDate.add(const Duration(days: 365));
+                          final currentDeadline = selectedDeadline;
+                          final initialDate = currentDeadline == null ||
+                                  currentDeadline.isBefore(firstDate)
+                              ? firstDate
+                              : currentDeadline.isAfter(lastDate)
+                                  ? lastDate
+                                  : currentDeadline;
+                          final picked = await showDatePicker(
+                            context: dialogContext,
+                            initialDate: initialDate,
+                            firstDate: firstDate,
+                            lastDate: lastDate,
+                          );
+                          if (picked != null) {
+                            setDialogState(() => selectedDeadline = picked);
+                          }
+                        },
+                        child: Text(
+                          selectedDeadline == null ? 'Set Date' : 'Change Date',
+                        ),
+                      ),
+                      if (selectedDeadline != null)
+                        IconButton(
+                          tooltip: 'Clear deadline',
+                          onPressed: () =>
+                              setDialogState(() => selectedDeadline = null),
+                          icon: const Icon(Icons.clear),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState?.validate() != true) return;
-              try {
-                await _taskService.updateTaskDetails(
-                  taskId: task.id,
-                  title: titleController.text.trim(),
-                  description: descriptionController.text.trim(),
-                  budget: double.parse(budgetController.text.trim()),
-                  location: locationController.text.trim(),
-                  deadline: task.deadline,
-                );
-                if (dialogContext.mounted) {
-                  Navigator.pop(dialogContext, true);
-                }
-              } catch (error) {
-                if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(content: Text('Error updating task: $error')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState?.validate() != true) return;
+                try {
+                  await _taskService.updateTaskDetails(
+                    taskId: task.id,
+                    title: titleController.text.trim(),
+                    description: descriptionController.text.trim(),
+                    budget: double.parse(budgetController.text.trim()),
+                    location: locationController.text.trim(),
+                    deadline: selectedDeadline,
                   );
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext, true);
+                  }
+                } catch (error) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Error updating task: $error')),
+                    );
+                  }
                 }
-              }
-            },
-            child: const Text('Save Changes'),
-          ),
-        ],
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -372,7 +425,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(
-                'Category: ${widget.task.category} • Location: ${widget.task.location}'),
+              'Category: ${widget.task.category} • Location: ${widget.task.location}',
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Deadline: ${widget.task.deadline == null ? 'Not set' : _formatDate(widget.task.deadline!)}',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 8),
             Text('Budget: R${widget.task.budget.toStringAsFixed(2)}',
                 style: const TextStyle(
