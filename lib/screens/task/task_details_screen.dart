@@ -4,6 +4,8 @@ import '../../data/remote/task_service.dart';
 import '../../models/task_model.dart';
 import '../../models/bid_model.dart';
 import '../../models/user_profile.dart';
+import '../../models/review_model.dart';
+import '../../data/remote/review_service.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
   final TaskModel task;
@@ -22,8 +24,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   final _bidFormKey = GlobalKey<FormState>();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
-  final TextEditingController _completionNoteController =
-      TextEditingController();
 
   bool get _isOwner => widget.task.posterId == widget.userProfile.uid;
   bool get _canCompleteTask =>
@@ -32,70 +32,171 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   String _formatDate(DateTime date) => date.toLocal().toString().split(' ')[0];
 
+  Future<void> _showReviewDialog(BuildContext context) async {
+    final commentController = TextEditingController();
+    var rating = 5.0;
+    final reviewService = ReviewService();
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Rate & Review Experience'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Select Star Rating:'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        index < rating ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                      ),
+                      onPressed: () {
+                        setDialogState(() => rating = (index + 1).toDouble());
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: commentController,
+                  decoration: const InputDecoration(
+                      labelText: 'Write a review comment'),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    final revieweeId = _isOwner
+                        ? widget.task.assignedProviderId
+                        : widget.task.posterId;
+                    if (revieweeId == null) {
+                      throw Exception('No review recipient found.');
+                    }
+
+                    final newReview = ReviewModel(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      taskId: widget.task.id,
+                      reviewerId: widget.userProfile.uid,
+                      revieweeId: revieweeId,
+                      rating: rating,
+                      comment: commentController.text.trim(),
+                      createdAt: DateTime.now(),
+                    );
+                    await reviewService.submitReview(newReview);
+
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                      if (messenger != null && messenger.mounted) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Review submitted successfully!'),
+                          ),
+                        );
+                      }
+                    }
+                  } catch (error) {
+                    if (dialogContext.mounted &&
+                        messenger != null &&
+                        messenger.mounted) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                            content: Text('Error submitting review: $error')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Submit Review'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      commentController.dispose();
+    }
+  }
+
   @override
   void dispose() {
     _priceController.dispose();
     _noteController.dispose();
-    _completionNoteController.dispose();
     super.dispose();
   }
 
-  void _showCompletionDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Complete Task Agreement'),
-        content: TextField(
-          controller: _completionNoteController,
-          decoration: const InputDecoration(
-              labelText: 'Work Summary / Completion Note'),
-          maxLines: 3,
+  Future<void> _showCompletionDialog(BuildContext context) async {
+    final completionNoteController = TextEditingController();
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Complete Task Agreement'),
+          content: TextField(
+            controller: completionNoteController,
+            decoration: const InputDecoration(
+                labelText: 'Work Summary / Completion Note'),
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final navigator = Navigator.of(dialogContext);
+                final messenger = ScaffoldMessenger.maybeOf(dialogContext);
+                try {
+                  await _taskService.updateTaskStatus(
+                    widget.task.id,
+                    'Completed',
+                    actorUid: widget.userProfile.uid,
+                    completionNote: completionNoteController.text.trim(),
+                  );
+
+                  if (!mounted) return;
+
+                  if (navigator.canPop()) {
+                    navigator.pop();
+                  }
+
+                  if (messenger != null) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Task marked as Completed!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (error) {
+                  if (dialogContext.mounted && messenger != null) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Error completing task: $error')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('Confirm Completion'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final navigator = Navigator.of(dialogContext);
-              final messenger = ScaffoldMessenger.maybeOf(dialogContext);
-              try {
-                await _taskService.updateTaskStatus(
-                  widget.task.id,
-                  'Completed',
-                  actorUid: widget.userProfile.uid,
-                  completionNote: _completionNoteController.text.trim(),
-                );
-
-                if (!mounted) return;
-
-                if (navigator.canPop()) {
-                  navigator.pop();
-                }
-
-                if (messenger != null) {
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Task marked as Completed!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (error) {
-                if (dialogContext.mounted && messenger != null) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text('Error completing task: $error')),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Confirm Completion'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      completionNoteController.dispose();
+    }
   }
 
   bool _isSubmitting = false;
@@ -499,6 +600,16 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       const SizedBox(height: 4),
                       Text('Summary: ${widget.task.completionNote}'),
                     ],
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => _showReviewDialog(context),
+                      icon: const Icon(Icons.star, color: Colors.amber),
+                      label: const Text('Leave Review & Rating'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black87,
+                      ),
+                    ),
                   ],
                 ),
               ),
