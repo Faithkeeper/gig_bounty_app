@@ -540,12 +540,22 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           title: Text(
-                              '${bid.providerName} (R${bid.proposedPrice.toStringAsFixed(2)})'),
+                            '${bid.providerName} • ⭐ ${bid.providerRating.toStringAsFixed(1)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Pitch: ${bid.proposalNote}'),
                               const SizedBox(height: 4),
+                              Text(
+                                'Proposed Price: R${bid.proposedPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: Colors.deepOrange,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text('Pitch: ${bid.proposalNote}'),
                             ],
                           ),
                           trailing:
